@@ -24,6 +24,11 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
   availability_zone = data.aws_availability_zones.available.names[count.index]
 }
+resource "aws_ssm_parameter" "public_subnets" {
+  name  = "/roboshop/dev/public_subnets"
+  type  = "StringList"
+  value = join(",", aws_subnet.public[*].id)
+}
 
 # Private Subnet
 resource "aws_subnet" "private" {

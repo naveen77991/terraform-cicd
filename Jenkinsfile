@@ -57,5 +57,19 @@ pipeline {
             }
         }
 
+        stage('Bastion') {   // 👈 NEW STAGE
+            steps {
+                script {
+                    withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                        sh '''
+                        cd 20-bastion
+                        terraform init
+                        terraform apply -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
     }
 }

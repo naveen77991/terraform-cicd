@@ -42,5 +42,16 @@ pipeline {
                 }
             }
         }
+        stage('SG') {
+    steps {
+        sh '''
+        cd 10-sg
+        terraform init
+        terraform apply -auto-approve
+        '''
+    }
+}
+       
+}
     }
 }

@@ -42,16 +42,20 @@ pipeline {
                 }
             }
         }
+
         stage('SG') {
-    steps {
-        sh '''
-        cd 10-sg
-        terraform init
-        terraform apply -auto-approve
-        '''
-    }
-}
-       
-}
+            steps {
+                script {
+                    withAWS(credentials: 'aws-creds', region: 'us-east-1') {
+                        sh '''
+                        cd 10-sg
+                        terraform init
+                        terraform apply -auto-approve
+                        '''
+                    }
+                }
+            }
+        }
+
     }
 }

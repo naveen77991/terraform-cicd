@@ -1,13 +1,16 @@
-
 provider "aws" {
   region = "us-east-1"
 }
 
+# Get AZs
+data "aws_availability_zones" "available" {}
+
 # VPC
 resource "aws_vpc" "main" {
-  cidr_block = var.vpc_cidr
+  cidr_block = "10.0.0.0/16"
+
   tags = {
-    Name = "${var.project}-${var.env}-vpc"
+    Name = "roboshop-dev-vpc"
   }
 }
 
@@ -16,37 +19,41 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 }
 
-# Public Subnet
+# Public Subnets
 resource "aws_subnet" "public" {
   count = 2
-  vpc_id     = aws_vpc.main.id
-  cidr_block = var.public_subnets[count.index]
+
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.${count.index + 1}.0/24"
   map_public_ip_on_launch = true
+
   availability_zone = data.aws_availability_zones.available.names[count.index]
-}
-resource "aws_ssm_parameter" "public_subnets" {
-  name  = "/roboshop/dev/public_subnets"
-  type  = "StringList"
-  value = join(",", aws_subnet.public[*].id)
+
+  tags = {
+    Name = "roboshop-dev-public-${count.index}"
+  }
 }
 
-# Private Subnet
+# Private Subnets
 resource "aws_subnet" "private" {
   count = 2
+
   vpc_id     = aws_vpc.main.id
-  cidr_block = var.private_subnets[count.index]
+  cidr_block = "10.0.${count.index + 10}.0/24"
+
   availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  tags = {
+    Name = "roboshop-dev-private-${count.index}"
+  }
 }
 
-# AZ Data
-data "aws_availability_zones" "available" {}
-
-# Public Route Table
+# Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 }
 
-# Route to Internet
+# Internet Route
 resource "aws_route" "internet" {
   route_table_id         = aws_route_table.public.id
   destination_cidr_block = "0.0.0.0/0"
@@ -56,24 +63,29 @@ resource "aws_route" "internet" {
 # Associate Public Subnets
 resource "aws_route_table_association" "public_assoc" {
   count = 2
+
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-# VPC Peering with Default VPC
-data "aws_vpc" "default" {
-  default = true
+# =====================
+# SSM PARAMETERS (VERY IMPORTANT)
+# =====================
+
+resource "aws_ssm_parameter" "vpc_id" {
+  name  = "/roboshop/dev/vpc_id"
+  type  = "String"
+  value = aws_vpc.main.id
 }
 
-resource "aws_vpc_peering_connection" "peer" {
-  vpc_id        = aws_vpc.main.id
-  peer_vpc_id   = data.aws_vpc.default.id
-  auto_accept   = true
+resource "aws_ssm_parameter" "public_subnets" {
+  name  = "/roboshop/dev/public_subnets"
+  type  = "StringList"
+  value = join(",", aws_subnet.public[*].id)
 }
 
-# Route to Default VPC (IMPORTANT FIX)
-resource "aws_route" "peer_route" {
-  route_table_id         = aws_route_table.public.id
-  destination_cidr_block = data.aws_vpc.default.cidr_block
-  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+resource "aws_ssm_parameter" "private_subnets" {
+  name  = "/roboshop/dev/private_subnets"
+  type  = "StringList"
+  value = join(",", aws_subnet.private[*].id)
 }
